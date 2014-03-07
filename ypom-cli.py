@@ -148,12 +148,6 @@ class User(object):
 userlist = {}   # indexed by user name
 b32list = {}    # indexed by B32 pubkey
 
-me_file = open('me.json', 'r')
-me_data = json.loads(me_file.read())
-print me_data
-
-me = User("ME", me_data.get('pk'), me_data.get('sk'))
-
 def publish_me_pk():
     data = {
         "_type" : "usr",
@@ -222,17 +216,20 @@ def on_subscribe(mosq, userdata, mid, granted_qos):
 def on_disconnect(mosq, userdata, rc):
     print "OOOOPS! disconnect"
 
+def quit():
+    mqttc.loop_stop()
+    mqttc.disconnect()
+    sys.exit(0)
+
 def input_loop():
     line = ''
-    print "Use TAB-completion for usernames."
-    while line != 'stop':
+    print "Use TAB-completion for usernames. (quit to exit)"
+    while line != 'quit':
         to = message = None
         try:
             line = raw_input(">> ")
         except KeyboardInterrupt:
-            mqttc.loop_stop()
-            mqttc.disconnect()
-            sys.exit(0)
+            quit()
 
         try:
             to, message = line.split(':', 2)
@@ -243,11 +240,19 @@ def input_loop():
             print "No PK for user %s available" % to
             continue
         u = userlist[to]
-        print u.username, u.pk32,  u.pk64
-        print me.username, me.pk32,  me.pk64
+        # print u.username, u.pk32,  u.pk64
+        # print me.username, me.pk32,  me.pk64
         u.send(message)
 
 readline.set_completer(completer.complete)
+
+try:
+    me_file = open('me.json', 'r')
+    me_data = json.loads(me_file.read())
+    me = User("ME", me_data.get('pk'), me_data.get('sk'))
+except Exception, e:
+    print "Cannot load `me.json': %s" % (str(e))
+    sys.exit(1)
 
 mqttc = paho.Client('ypom-cli', clean_session=False, userdata=None)
 mqttc.on_message = on_message
