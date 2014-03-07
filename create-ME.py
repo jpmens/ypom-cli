@@ -29,7 +29,7 @@ def store(username, sk, pk):
         sys.exit(1)
 
     fd = open(path, 'w')
-    fd.write("%s\n" % json.dumps(data))
+    fd.write("%s\n" % json.dumps(data, indent=4))
     fd.close()
     os.chmod(path, stat.S_IREAD)
 
