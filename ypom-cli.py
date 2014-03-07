@@ -113,7 +113,7 @@ class User(object):
         nonce =  b64encode(out_nonce)
         ciphertext = b64encode(out_crypted)
 
-        topic = topicname(me.sk32, self.pk32)
+        topic = topicname(me.pk32, self.pk32)
         mqttpayload = '%s:%s' % (nonce, ciphertext)
 
         mqttc.publish(topic, mqttpayload, qos=2, retain=False)
@@ -230,6 +230,8 @@ def input_loop():
             print "No PK for user %s available" % to
             continue
         u = userlist[to]
+        print u.username, u.pk32,  u.pk64
+        print me.username, me.pk32,  me.pk64
         u.send(message)
 
 readline.set_completer(completer.complete)
