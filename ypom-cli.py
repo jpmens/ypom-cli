@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import paho.mqtt.client as paho   # pip install paho-mqtt
+import sys
 import ssl
 import time
 import json
@@ -226,7 +227,13 @@ def input_loop():
     print "Use TAB-completion for usernames."
     while line != 'stop':
         to = message = None
-        line = raw_input(">> ")
+        try:
+            line = raw_input(">> ")
+        except KeyboardInterrupt:
+            mqttc.loop_stop()
+            mqttc.disconnect()
+            sys.exit(0)
+
         try:
             to, message = line.split(':', 2)
             message = message.lstrip().rstrip()
@@ -242,7 +249,7 @@ def input_loop():
 
 readline.set_completer(completer.complete)
 
-mqttc = paho.Client('ypom-cli', clean_session=True, userdata=None)
+mqttc = paho.Client('ypom-cli', clean_session=False, userdata=None)
 mqttc.on_message = on_message
 mqttc.on_connect = on_connect
 mqttc.on_disconnect = on_disconnect
