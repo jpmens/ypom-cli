@@ -113,7 +113,8 @@ class User(object):
         nonce =  b64encode(out_nonce)
         ciphertext = b64encode(out_crypted)
 
-        topic = topicname(me.pk32, self.pk32)
+        #   to/from
+        topic = topicname(self.pk32, me.pk32)
         mqttpayload = '%s:%s' % (nonce, ciphertext)
 
         mqttc.publish(topic, mqttpayload, qos=2, retain=False)
@@ -127,16 +128,21 @@ class User(object):
         ciphertext = b64decode(encrypted)
 
         plaintext = box.decrypt(ciphertext, nonce=nonce)
-
         message_data = json.loads(plaintext)
 
-        message = b64decode(message_data['content'])
-        tst = message_data['timestamp']
+# {"timestamp":"1394207409.633","_type":"ack"}
 
-        time_str = time.strftime('%H:%M', time.localtime(float(tst)))
+        if '_type' in message_data:
+            if message_data.get('_type') == 'ack':
+                tst = message_data.get('timestamp')
+                time_str = time.strftime('%H:%M', time.localtime(float(tst)))
+                return time_str, "ACK"
+            if message_data.get('_type') == 'msg':
+                message = b64decode(message_data['content'])
+                tst = message_data['timestamp']
 
-
-        return time_str, message
+                time_str = time.strftime('%H:%M', time.localtime(float(tst)))
+                return time_str, message
 
 userlist = {}   # indexed by user name
 b32list = {}    # indexed by B32 pubkey
@@ -188,11 +194,10 @@ def on_message(mosq, userdata, msg):
 
         #print "FROM ", from32
         #print "TO   ", to32
-        #print "ME   ", me.pk32
-        #print "ME   ", me.sk32
+        #print "ME pk", me.pk32
+        #print "ME sk", me.sk32
 
-# FIXME: something incorrect here
-        if to32 == me.sk32:       # ignore self-sent messages
+        if str(from32) == str(me.pk32):       # ignore self-sent messages
             return
 
         try:
@@ -202,6 +207,7 @@ def on_message(mosq, userdata, msg):
             tst, msg = u_from.decrypt(msg.payload)
             print "%s: %s  [%s]" % (u_from.username, msg, tst)
         except:
+            raise
             print "SOMETHING WRONG"
 
 def on_publish(mosq, userdata, mid):
