@@ -285,7 +285,7 @@ def input_loop():
             path = message[1:].lstrip().rstrip()
             try:
                 fd = open(path, 'rb')
-                data = fd.read()
+                message = fd.read()
                 fd.close()
                 content_type = 'image/png'
                 try:
