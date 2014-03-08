@@ -161,7 +161,7 @@ class User(object):
                         return time_str, "Cannot create file %s: %s" % (filename, str(e))
 
 
-                    return time_str, "Incoming file stored as %s" % filename
+                    return time_str, "<Incoming file stored as %s>" % filename
 
 
                 if message_data.get('content-type') != u'text/plain; charset:"utf-8"':
@@ -258,8 +258,12 @@ def input_loop():
         try:
             to, message = line.split(':', 2)
             message = message.lstrip().rstrip()
-        except:
-            continue
+        except ValueError:
+            try:
+                to, message = line.split(' ', 2)
+                message = message.lstrip().rstrip()
+            except:
+                continue
         if to not in userlist:
             print "No PK for user %s available" % to
             continue
