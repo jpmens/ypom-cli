@@ -265,7 +265,7 @@ def input_loop():
             message = message.lstrip().rstrip()
         except ValueError:
             try:
-                to, message = line.split(' ', 2)
+                to, message = line.split(' ', 1)
                 message = message.lstrip().rstrip()
             except:
                 continue
