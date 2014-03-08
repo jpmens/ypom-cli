@@ -260,7 +260,7 @@ def input_loop():
     while line != 'quit':
         to = message = None
         try:
-            line = raw_input(">> ")
+            line = raw_input("%s> " % me.username)
         except KeyboardInterrupt:
             quit()
 
@@ -322,13 +322,13 @@ try:
     plaintext = box.decrypt(encrypted_data)
 
     me_data = json.loads(plaintext)
-    me = User("ME", me_data.get('pk'), me_data.get('sk'))
+    me = User(me_data.get('username', 'ME'), me_data.get('pk'), me_data.get('sk'))
 except Exception, e:
     print "Cannot load `me.creds': %s" % (str(e))
     sys.exit(1)
 
 
-mqttc = paho.Client('ypom-cli', clean_session=True, userdata=None)
+mqttc = paho.Client('ypom-cli-%s' % os.getpid(), clean_session=True, userdata=None)
 mqttc.on_message = on_message
 mqttc.on_connect = on_connect
 mqttc.on_disconnect = on_disconnect
