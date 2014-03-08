@@ -8,6 +8,9 @@ import time
 import json
 import readline
 from base64 import b32encode, b64encode, b64decode
+import binascii
+import getpass
+import os
 import warnings
 
 __author__    = 'Jan-Piet Mens <jpmens()gmail.com>'
@@ -18,6 +21,8 @@ with warnings.catch_warnings():
     warnings.simplefilter('ignore')
 
     import nacl.utils
+    import nacl.secret
+    import nacl.hash
     from nacl.public import PrivateKey, PublicKey, Box
     from nacl.encoding import Base64Encoder
 
@@ -275,12 +280,32 @@ def input_loop():
 readline.set_completer(completer.complete)
 
 try:
-    me_file = open('me.json', 'r')
-    me_data = json.loads(me_file.read())
+    me_file = open('me.creds', 'r')
+
+    pw = os.getenv("YPOMCREDSPW")
+    if pw is None:
+        try:
+            pw = os.getenv("YPOMCREDSPW", getpass.getpass('Enter password to decrypt private key: '))
+        except KeyboardInterrupt:
+            sys.exit(2)
+
+    h = nacl.hash.sha256(pw)
+
+    key = binascii.unhexlify(h)
+
+    box = nacl.secret.SecretBox(key)
+
+    message = me_file.read().rstrip()
+    encrypted_data = binascii.unhexlify(message)
+
+    plaintext = box.decrypt(encrypted_data)
+
+    me_data = json.loads(plaintext)
     me = User("ME", me_data.get('pk'), me_data.get('sk'))
 except Exception, e:
-    print "Cannot load `me.json': %s" % (str(e))
+    print "Cannot load `me.creds': %s" % (str(e))
     sys.exit(1)
+
 
 mqttc = paho.Client('ypom-cli', clean_session=True, userdata=None)
 mqttc.on_message = on_message

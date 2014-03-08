@@ -7,5 +7,6 @@
 
 ## Features
 
+* credentials data (`me.creds`) encrypted
 * content-type recognition
 * incoming image files are stored as `<username>-<timestamp>.<extension>`
