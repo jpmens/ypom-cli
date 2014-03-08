@@ -94,6 +94,7 @@ class User(object):
             "_type" : "msg",
             "timestamp" : time.time(),
             "content" : b64encode(msg),
+            "content-type" : 'text/plain; charset:"utf-8"',
         }
         clear_text =  json.dumps(data)
 
