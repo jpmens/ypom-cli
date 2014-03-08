@@ -12,6 +12,7 @@ import binascii
 import getpass
 import os
 import warnings
+import imghdr
 
 __author__    = 'Jan-Piet Mens <jpmens()gmail.com>'
 __copyright__ = 'Copyright 2014 Jan-Piet Mens'
@@ -90,16 +91,19 @@ class User(object):
             self.pk64 = pk64
             b32list[self.pk32] = self
 
-    def send(self, msg):
+    def send(self, msg, content_type=None):
         ''' Send the clear text 'msg' to this user '''
 
         box = Box(me.sk, self.pk)
+
+        if content_type == None:
+            content_type = 'text/plain; charset:"utf-8"'
 
         data = {
             "_type" : "msg",
             "timestamp" : time.time(),
             "content" : b64encode(msg),
-            "content-type" : 'text/plain; charset:"utf-8"',
+            "content-type" : content_type,
         }
         clear_text =  json.dumps(data)
 
@@ -275,7 +279,24 @@ def input_loop():
         u = userlist[to]
         # print u.username, u.pk32,  u.pk64
         # print me.username, me.pk32,  me.pk64
-        u.send(message)
+
+        content_type = None
+        if message.startswith('<'):
+            path = message[1:].lstrip().rstrip()
+            try:
+                fd = open(path, 'rb')
+                data = fd.read()
+                fd.close()
+                content_type = 'image/png'
+                try:
+                    content_type = 'image/%s' % imghdr.what(path)
+                except:
+                    pass
+            except Exception, e:
+                print "Cannot open file %s for reading: %s" % (path, str(e))
+                continue
+
+        u.send(message, content_type)
 
 readline.set_completer(completer.complete)
 
