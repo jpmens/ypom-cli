@@ -42,7 +42,7 @@ def store(username, pw, sk, pk):
     encrypted = box.encrypt(message, nonce)
 
     fd = open(path, 'w')
-    fd.write("%s\n" % binascii.hexlify(encrypted))
+    fd.write(binascii.hexlify(encrypted))
     fd.close()
     os.chmod(path, stat.S_IREAD)
 
