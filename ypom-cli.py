@@ -131,7 +131,8 @@ class User(object):
         plaintext = box.decrypt(ciphertext, nonce=nonce)
         message_data = json.loads(plaintext)
 
-# {"timestamp":"1394207409.633","_type":"ack"}
+        # print "MSG_DATA = ", message_data
+        # {"timestamp":"1394207409.633","_type":"ack"}
 
         if '_type' in message_data:
             if message_data.get('_type') == 'ack':
@@ -141,8 +142,10 @@ class User(object):
             if message_data.get('_type') == 'msg':
                 message = b64decode(message_data['content'])
                 tst = message_data['timestamp']
-
                 time_str = time.strftime('%H:%M', time.localtime(float(tst)))
+
+                if message_data.get('content-type') != u'text/plain; charset:"utf-8"':
+                    message = 'Unsupported content-type: %s' % message_data.get('content-type')
                 return time_str, message
 
 userlist = {}   # indexed by user name
@@ -161,7 +164,7 @@ def publish_me_pk():
 
 def on_connect(mosq, userdata, rc):
     mqttc.subscribe("ypom/+", 2)
-    mqttc.subscribe("ypom/+/+", 2)
+    mqttc.subscribe("ypom/%s/+" % (me.pk32), 2)
 
 def on_message(mosq, userdata, msg):
     # print "%s (qos=%s, r=%s) %s" % (msg.topic, str(msg.qos), msg.retain, str(msg.payload))
@@ -192,15 +195,16 @@ def on_message(mosq, userdata, msg):
         #print "ME pk", me.pk32
         #print "ME sk", me.sk32
 
-        if str(from32) == str(me.pk32):       # ignore self-sent messages
-            return
+        #if str(from32) == str(me.pk32):       # ignore self-sent messages
+        #    return
 
         try:
             u_from = b32list[from32]
             u_to = b32list[to32]
 
             tst, msg = u_from.decrypt(msg.payload)
-            print "%s: %s  [%s]" % (u_from.username, msg, tst)
+            msg = msg.decode('utf-8')
+            print u'%s: %s  [%s]' % (u_from.username, msg, tst)
         except:
             raise
             print "SOMETHING WRONG"
@@ -254,7 +258,7 @@ except Exception, e:
     print "Cannot load `me.json': %s" % (str(e))
     sys.exit(1)
 
-mqttc = paho.Client('ypom-cli', clean_session=False, userdata=None)
+mqttc = paho.Client('ypom-cli', clean_session=True, userdata=None)
 mqttc.on_message = on_message
 mqttc.on_connect = on_connect
 mqttc.on_disconnect = on_disconnect
