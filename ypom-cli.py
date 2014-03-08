@@ -123,6 +123,12 @@ class User(object):
 
     def decrypt(self, mqttpayload):
 
+        image_types = {
+            'image/png'         : 'png',
+            'image/jpeg'        : 'jpg',
+            'image/jpg'         : 'jpg',
+            'image/gif'         : 'gif',
+        }
         box = Box(me.sk, self.pk)
         nonce, encrypted = mqttpayload.split(':')
 
@@ -136,14 +142,27 @@ class User(object):
         # {"timestamp":"1394207409.633","_type":"ack"}
 
         if '_type' in message_data:
+            tst = message_data['timestamp']
+            time_str = time.strftime('%H:%M', time.localtime(float(tst)))
             if message_data.get('_type') == 'ack':
-                tst = message_data.get('timestamp')
-                time_str = time.strftime('%H:%M', time.localtime(float(tst)))
                 return time_str, "ACK"
             if message_data.get('_type') == 'msg':
                 message = b64decode(message_data['content'])
-                tst = message_data['timestamp']
-                time_str = time.strftime('%H:%M', time.localtime(float(tst)))
+
+                content_type = message_data.get('content-type', 'unknown')
+                if content_type in image_types:
+                    extension = image_types[content_type]
+                    filename = '%s-%s.%s' % (self.username, time.time(), extension)
+                    try:
+                        fd = open(filename, "wb")
+                        fd.write(message)
+                        fd.close()
+                    except Exception, e:
+                        return time_str, "Cannot create file %s: %s" % (filename, str(e))
+
+
+                    return time_str, "Incoming file stored as %s" % filename
+
 
                 if message_data.get('content-type') != u'text/plain; charset:"utf-8"':
                     message = 'Unsupported content-type: %s' % message_data.get('content-type')
