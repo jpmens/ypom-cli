@@ -190,6 +190,9 @@ def publish_me_pk():
     topic = 'ypom/%s' % me.pk32
     mqttc.publish(topic, mqttpayload, qos=2, retain=True)
 
+    topic = 'ypom/%s/users/online' % me.pk32
+    mqttc.publish(topic, '1', qos=2, retain=False)
+
 
 def on_connect(mosq, userdata, rc):
     mqttc.subscribe("ypom/+", 2)
@@ -334,6 +337,9 @@ mqttc.on_connect = on_connect
 mqttc.on_disconnect = on_disconnect
 mqttc.on_publish = on_publish
 mqttc.on_subscribe = on_subscribe
+
+topic = 'ypom/%s/users/online' % me.pk32
+mqttc.will_set(topic, '0', qos=2, retain=False)
 
 mqttc.connect("localhost", 1883, 60)
 
