@@ -24,7 +24,8 @@ with warnings.catch_warnings():
     import nacl.utils
     import nacl.secret
     import nacl.hash
-    from nacl.public import PrivateKey, PublicKey, Box
+    import nacl.signing
+    from nacl.public import PublicKey, PrivateKey, Box
     from nacl.encoding import Base64Encoder
 
 class Completer(object):
@@ -58,43 +59,46 @@ class Completer(object):
 
 completer = Completer(None)
 
-def topicname(sk32, pk32):
-    ''' return an MQTT topic name consisting of a prefix followed
-        by the base32-encoded public key of the recipient (TO),
-        followed by the base32-encoded public key of the sender (FROM)
-        '''
+def topicname(toid, fromid):
     prefix = 'ypom'
 
     # to/from
-    topic = '%s/%s/%s' % ( prefix, sk32, pk32)
+    topic = '%s/%s/%s' % ( prefix, toid, fromid)
     return topic
 
 class User(object):
 
-    def __init__(self, username, pk64, sk64=None):
-        self.username = username
-        self.sk = None
-        self.sk32 = None
-        self.sk64 = None
-        self.pk = None
-        self.pk32 = None
-        self.pk64 = None
+    def __init__(self, identifier, pubkey64, verkey64, seckey64=None, sigkey64=None):
+        self.identifier = identifier
+        self.seckey = None
+        self.seckey64 = None
+        self.pubkey = None
+        self.pubkey64 = None
+        self.sigkey = None
+        self.sigkey64 = None
+        self.verkey = None
+        self.verkey64 = None
 
-        if sk64 is not None:
-            self.sk64 = sk64
-            self.sk = PrivateKey(sk64, encoder=Base64Encoder)
-            self.sk32 = b32encode(self.sk.__bytes__())
+        if pubkey64 is not None:
+            self.pubkey = PublicKey(pubkey64, encoder=Base64Encoder)
+            self.pubkey64 = pubkey64
 
-        if pk64 is not None:
-            self.pk = PublicKey(pk64, encoder=Base64Encoder)
-            self.pk32 = b32encode(self.pk.__bytes__())
-            self.pk64 = pk64
-            b32list[self.pk32] = self
+        if seckey64 is not None:
+            self.seckey64 = seckey64
+            self.seckey = PrivateKey(seckey64, encoder=Base64Encoder)
+
+        if verkey64 is not None:
+            self.verkey = nacl.signing.VerifyKey(verkey64, encoder=Base64Encoder)
+            self.verkey64 = verkey64
+
+        if sigkey64 is not None:
+            self.sigkey64 = sigkey64
+            self.sigkey = nacl.signing.SigningKey(sigkey64, encoder=Base64Encoder)
 
     def send(self, msg, content_type=None):
         ''' Send the clear text 'msg' to this user '''
 
-        box = Box(me.sk, self.pk)
+        box = Box(me.seckey, self.pubkey)
 
         if content_type == None:
             content_type = 'text/plain; charset:"utf-8"'
@@ -116,19 +120,12 @@ class User(object):
 
         encrypted = box.encrypt(clear_text, nonce)
 
-        # FIXME: sign!
-
-        out_nonce = encrypted[0:24]
-        out_crypted = encrypted[24:]
-
-        nonce =  b64encode(out_nonce)
-        ciphertext = b64encode(out_crypted)
+        signed = me.sigkey.sign(encrypted, encoder=Base64Encoder);
 
         #   to/from
-        topic = topicname(self.pk32, me.pk32)
-        mqttpayload = '%s:%s' % (nonce, ciphertext)
+        topic = topicname(self.identifier, me.identifier)
 
-        mqttc.publish(topic, mqttpayload, qos=2, retain=False)
+        mqttc.publish(topic, signed, qos=2, retain=False)
 
     def decrypt(self, mqttpayload):
 
@@ -138,30 +135,36 @@ class User(object):
             'image/jpg'         : 'jpg',
             'image/gif'         : 'gif',
         }
-        box = Box(me.sk, self.pk)
-        nonce, encrypted = mqttpayload.split(':')
 
-        nonce = b64decode(nonce)
-        ciphertext = b64decode(encrypted)
+	messagehex = b64decode(mqttpayload)
+	message = nacl.signing.SignedMessage(messagehex)
+	self.verkey.verify(message)
+	#print "verified"
 
-        plaintext = box.decrypt(ciphertext, nonce=nonce)
+        box = Box(me.seckey, self.pubkey)
+	
+        #
+        #CK don't like the literal 64, but I don't know where to get the symbol
+        #
+        plaintext = box.decrypt(message[64:])
+	#print "decrypted"
         message_data = json.loads(plaintext)
-
-        # print "MSG_DATA = ", message_data
-        # {"timestamp":"1394207409.633","_type":"ack"}
+	#print "json out"
 
         if '_type' in message_data:
             tst = message_data['timestamp']
             time_str = time.strftime('%H:%M', time.localtime(float(tst)))
             if message_data.get('_type') == 'ack':
                 return time_str, "ACK"
+            if message_data.get('_type') == 'see':
+                return time_str, "SEE"
             if message_data.get('_type') == 'msg':
                 message = b64decode(message_data['content'])
 
                 content_type = message_data.get('content-type', 'unknown')
                 if content_type in image_types:
                     extension = image_types[content_type]
-                    filename = '%s-%s.%s' % (self.username, time.time(), extension)
+                    filename = '%s-%s.%s' % (self.identifier, time.time(), extension)
                     try:
                         fd = open(filename, "wb")
                         fd.write(message)
@@ -177,26 +180,17 @@ class User(object):
                     message = 'Unsupported content-type: %s' % message_data.get('content-type')
                 return time_str, message
 
-userlist = {}   # indexed by user name
-b32list = {}    # indexed by B32 pubkey
-
-def publish_me_pk():
-    data = {
-        "_type" : "usr",
-        "name" : me_data.get('username', 'unknown'),
-        "pk" : me_data.get('pk'),
-    }
-    mqttpayload = json.dumps(data)
-    topic = 'ypom/%s' % me.pk32
-    mqttc.publish(topic, mqttpayload, qos=2, retain=True)
-
-    topic = 'ypom/%s/users/online' % me.pk32
-    mqttc.publish(topic, '1', qos=2, retain=False)
+userlist = {}   # indexed by user identifier
 
 
 def on_connect(mosq, userdata, rc):
-    mqttc.subscribe("ypom/+", 2)
-    mqttc.subscribe("ypom/%s/+" % (me.pk32), 2)
+    mysub = "ypom/%s/+" % me.identifier
+    print "subscribing to >%s< " % mysub
+    #
+    #CK: I don't understand why next line throws an error... use constant for the time being
+    #
+    #mqttc.subscribe(mysub, 2)
+    mqttc.subscribe("ypom/PPD7PXPG/+", 2)
 
 def on_message(mosq, userdata, msg):
     # print "%s (qos=%s, r=%s) %s" % (msg.topic, str(msg.qos), msg.retain, str(msg.payload))
@@ -204,49 +198,26 @@ def on_message(mosq, userdata, msg):
     topic = msg.topic
     payload = msg.payload
 
-    if paho.topic_matches_sub('ypom/+', topic):
-        try:
-            userdata = json.loads(payload)
-        except:
-            print "Cannot parse JSON"
-            return
-        if '_type' in userdata and userdata['_type'] == 'usr':
-            if 'name' in userdata and 'pk' in userdata:
-                username = userdata['name']
-                userlist[username] = User(username, userdata['pk'])
-                completer.add(username)
-
-    ''' Receive a message.
-        ypom/TO/from    (TO == me)
-    '''
     if paho.topic_matches_sub('ypom/+/+', topic):
-        prefix, to32, from32 = topic.split('/', 3)
-
-        #print "FROM ", from32
-        #print "TO   ", to32
-        #print "ME pk", me.pk32
-        #print "ME sk", me.sk32
-
-        #if str(from32) == str(me.pk32):       # ignore self-sent messages
-        #    return
+        prefix, toidentifier, fromidentifier = topic.split('/', 3)
 
         try:
-            u_from = b32list[from32]
-            u_to = b32list[to32]
+            u_from = userlist[fromidentifier]
+            u_to = userlist[toidentifier]
 
             tst, msg = u_from.decrypt(msg.payload)
             msg = msg.decode('utf-8')
-            print u'%s: %s  [%s]' % (u_from.username, msg, tst)
+            print u'%s: %s  [%s]' % (u_from.identifier, msg, tst)
         except:
             raise
             print "SOMETHING WRONG"
 
 def on_publish(mosq, userdata, mid):
-    # print("published mid: "+str(mid))
+    #print("published mid: "+str(mid))
     pass
 
 def on_subscribe(mosq, userdata, mid, granted_qos):
-    # print("Subscribed: "+str(mid)+" "+str(granted_qos))
+    #print("Subscribed: "+str(mid)+" "+str(granted_qos))
     pass
 
 def on_disconnect(mosq, userdata, rc):
@@ -259,11 +230,11 @@ def quit():
 
 def input_loop():
     line = ''
-    print "Use TAB-completion for usernames. (quit to exit)"
+    print "Use TAB-completion for identifier. (quit to exit)"
     while line != 'quit':
         to = message = None
         try:
-            line = raw_input("%s> " % me.username)
+            line = raw_input("%s> " % me.identifier)
         except KeyboardInterrupt:
             quit()
 
@@ -277,11 +248,9 @@ def input_loop():
             except:
                 continue
         if to not in userlist:
-            print "No PK for user %s available" % to
+            print "user %s unknown" % to
             continue
         u = userlist[to]
-        # print u.username, u.pk32,  u.pk64
-        # print me.username, me.pk32,  me.pk64
 
         content_type = None
         if message.startswith('<'):
@@ -325,7 +294,18 @@ try:
     plaintext = box.decrypt(encrypted_data)
 
     me_data = json.loads(plaintext)
-    me = User(me_data.get('username', 'ME'), me_data.get('pk'), me_data.get('sk'))
+    me = User(me_data.get('id'), me_data.get('pubkey'), me_data.get('verkey'), me_data.get('seckey'), me_data.get('sigkey'))
+    userlist[me_data.get('id')] = me;
+    print "I am:>%s<" % me.identifier 
+
+    user_file = open('users', 'r')
+    for user in user_file:
+        userdata = json.loads(user)
+        identifier = userdata['id']
+        userlist[identifier] = User(identifier, userdata['pubkey'], userdata['verkey'])
+        print "loaded user: %s" % identifier 
+        completer.add(identifier)
+
 except Exception, e:
     print "Cannot load `me.creds': %s" % (str(e))
     sys.exit(1)
@@ -338,14 +318,9 @@ mqttc.on_disconnect = on_disconnect
 mqttc.on_publish = on_publish
 mqttc.on_subscribe = on_subscribe
 
-topic = 'ypom/%s/users/online' % me.pk32
-mqttc.will_set(topic, '0', qos=2, retain=False)
-
 mqttc.connect("localhost", 1883, 60)
 
 mqttc.loop_start()
-
-publish_me_pk()
 
 input_loop()
 
