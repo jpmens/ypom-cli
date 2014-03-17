@@ -5,7 +5,7 @@ import binascii
 import sys
 import os
 import stat
-from base64 import b64encode
+from base64 import b64encode, b64decode, b32encode
 import json
 import getpass
 
@@ -15,16 +15,21 @@ with warnings.catch_warnings():
     import nacl.utils
     import nacl.secret
     import nacl.hash
+    #CK signing
+    import nacl.signing
     from nacl.public import PrivateKey, PublicKey, Box
-    from nacl.encoding import HexEncoder, Base64Encoder
+    from nacl.encoding import HexEncoder, Base64Encoder, Base32Encoder
 
-def store(username, pw, sk, pk):
+#CK id sigkey + verkey
+def store(id, pw, seckey, pubkey, sigkey, verkey):
 
     path = 'me.creds'
     data = {
-        'username'  : username,
-        'sk'        : b64encode(sk),
-        'pk'        : b64encode(pk),
+        'id'		: id,
+        'seckey'	: b64encode(seckey),
+        'pubkey'	: b64encode(pubkey),
+        'sigkey'	: b64encode(sigkey),
+        'verkey'	: b64encode(verkey)
     }
 
     if os.path.exists(path):
@@ -46,13 +51,21 @@ def store(username, pw, sk, pk):
     fd.close()
     os.chmod(path, stat.S_IREAD)
 
+    ypomdata = {
+        'id'		: id,
+        'pubkey'	: b64encode(pubkey),
+        'verkey'	: b64encode(verkey)
+    }
+    fd = open('me.ypom', 'w')
+    fd.write(json.dumps(ypomdata))
+    fd.close()
+
+
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        print "Usage: username"
+    if len(sys.argv) != 1:
+        print "Usage: %s" % sys.argv[0]
         sys.exit(1)
-
-    username = sys.argv[1]
 
     pw1 = getpass.getpass('Enter password to protect private key: ')
     pw2 = getpass.getpass('Re-enter same password: ')
@@ -64,5 +77,22 @@ if __name__ == '__main__':
     secret_key = PrivateKey.generate()
     public_key = secret_key.public_key
 
-    store(username, pw1, secret_key.__bytes__(), public_key.__bytes__())
+    #CK add signing
+    signing_key = nacl.signing.SigningKey.generate()
+    verify_key = signing_key.verify_key
+
+    #CK add id generation
+    hash = nacl.hash.sha256(public_key.__bytes__())
+    #print "hash: %s" % hash 
+
+    hashbin = b64decode(hash)
+    #print "hashbin: %s" % hashbin
+ 
+    hash32 = b32encode(hashbin)
+    #print "hash32: %s" % hash32 
+
+    id = hash32[:8]
+    print "id: %s" % id 
+
+    store(id, pw1, secret_key.__bytes__(), public_key.__bytes__(), signing_key.__bytes__(), verify_key.__bytes__())
 
