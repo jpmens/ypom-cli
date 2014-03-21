@@ -1,6 +1,5 @@
-
-## HOWTO
-* ./create-ME.py
+# HOWTO
+## ./create-ME.py
 
 create-ME creates a keypair for encryption and a second pair for message signing. It hashes and extracts a 8-character base32 identifier from your
 public encryption key.
@@ -16,7 +15,7 @@ You send this file to your communication partners. Example:
 {"verkey": "Mn9LcroTboiiWKS0Vxn6qL6gV68A3RyfgE7moXzoQpQ=", "pubkey": "9MpEzoCKci0xMFOPKFANX8j67y7gqpTNa5hvQGg6G1s=", "id": "PPD7PXPG"}
 ```
 
-* ./ypom-cli
+## ./ypom-cli
 
 ypom-cli prompts you for your protection phrase and loads your secrets from `me.creds`. Example:
 ```
@@ -42,8 +41,7 @@ To send a text message type `<identifier>:<message>`. To send an image file type
 ```
 identifier: < path.[png|jpg]
 ```
-
-* ./ypom-admin
+## ./ypom-admin
 
 ypom-admin creates an MQTT password and autoconfig file for the clients
 
@@ -52,10 +50,10 @@ Setup 'host.info'
 
 Run ./ypom-admin. It creates
 
-** a random password in base32
-** a snipped to be appended to mosquitto's aclfile '<id>.acl'
-** a snipped to be appended to mosquitto's pwdfile '<id>.passwd'
-** an autoconfig file for the client '<id>.ypom'
+* a random password in base32
+* a snipped to be appended to mosquitto's aclfile '<id>.acl'
+* a snipped to be appended to mosquitto's pwdfile '<id>.passwd'
+* an autoconfig file for the client '<id>.ypom'
 This file contains id, password, host, port, auth-flag, tls-flag. The file is encrypted and signed.
 The certificate for tls needs to be send separately.
 
