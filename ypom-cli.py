@@ -298,6 +298,11 @@ try:
     userlist[me_data.get('id')] = me;
     print "I am:>%s<" % me.identifier 
 
+except Exception, e:
+    print "Cannot load `me.creds': %s" % (str(e))
+    sys.exit(1)
+
+try:
     user_file = open('users', 'r')
     for user in user_file:
         userdata = json.loads(user)
@@ -307,7 +312,7 @@ try:
         completer.add(identifier)
 
 except Exception, e:
-    print "Cannot load `me.creds': %s" % (str(e))
+    print "Cannot load `users': %s" % (str(e))
     sys.exit(1)
 
 
