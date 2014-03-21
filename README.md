@@ -40,6 +40,22 @@ To send a text message type `<identifier>:<message>`. To send an image file type
 * incoming image files are stored as `<identifier>-<timestamp>.<extension>`
 * Upload images to user:
 ```
-identifier: < path.png
+identifier: < path.[png|jpg]
 ```
+
+* ./ypom-admin
+
+ypom-admin creates an MQTT password and autoconfig file for the clients
+
+Copy the *.ypom file send by the client to 'newuser.ypom'
+Setup 'host.info'
+
+Run ./ypom-admin. It creates
+
+** a random password in base32
+** a snipped to be appended to mosquitto's aclfile '<id>.acl'
+** a snipped to be appended to mosquitto's pwdfile '<id>.passwd'
+** an autoconfig file for the client '<id>.ypom'
+This file contains id, password, host, port, auth-flag, tls-flag. The file is encrypted and signed.
+The certificate for tls needs to be send separately.
 

@@ -24,13 +24,14 @@ with warnings.catch_warnings():
     from nacl.public import PublicKey, PrivateKey, Box
     from nacl.encoding import Base64Encoder
 
-def storelogin(identifier, passwordstring, host, port, tls):
+def storelogin(identifier, passwordstring, host, port, auth, tls):
 
     logindata = {
         'user'		: identifier,
         'passwd'	: passwordstring,
         'host'		: host,
         'port'		: port,
+        'auth'		: auth
         'tls'		: tls
     }
 
@@ -119,6 +120,7 @@ try:
     hostdata = json.loads(host)
     host_host = hostdata['host']
     host_port = hostdata['port']
+    host_auth = hostdata['auth']
     host_tls = hostdata['tls']
 
 except Exception, e:
@@ -136,14 +138,13 @@ try:
 
     user_passwd = nacl.utils.random(32);
     user_passwdstring = b32encode(user_passwd)
-    print "pass: %s" % user_passwdstring
 
     os.system ('(echo "%s"; echo "%s") | mosquitto_passwd -c %s.passwd %s >/dev/null' %
 	(user_passwdstring, user_passwdstring, user_identifier, user_identifier))
 
     storeacl(user_identifier)
 
-    storelogin(user_identifier, user_passwdstring, host_host, host_port, host_tls)
+    storelogin(user_identifier, user_passwdstring, host_host, host_port, host_auth, host_tls)
 
     print "Done for identifier:%s" % user_identifier
 
