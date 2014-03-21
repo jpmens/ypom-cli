@@ -31,7 +31,7 @@ def storelogin(identifier, passwordstring, host, port, auth, tls):
         'passwd'	: passwordstring,
         'host'		: host,
         'port'		: port,
-        'auth'		: auth
+        'auth'		: auth,
         'tls'		: tls
     }
 
