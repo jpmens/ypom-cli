@@ -2,3 +2,7 @@ me.json
 me.creds
 me.ypom
 users
+host.info
+*.ypom
+*.acl
+*.passwd
